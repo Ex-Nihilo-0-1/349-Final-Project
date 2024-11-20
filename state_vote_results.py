@@ -1,4 +1,5 @@
 import requests as r
+import csv
 from bs4 import BeautifulSoup
 
 def get_state_list():
@@ -57,6 +58,38 @@ def get_county_results(state, year):
             results += [result]
         except Exception as e:
             pass
+    return results
+
+
+def get_past_ten_elections_by_county(state):
+    
+    results = []
+    for i in range (10):
+        try:
+            results += get_county_results(state, 2008 - 4*i)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            print(state, 2008 - 4*i)
+    return results
+#county = state_vote_results.get_county_results("Texas")[14].find("td")
+
+#county_color = county.attrs["style"].split("background-color:")[1].split(";")[0]
+#if county_color == "#FFB6B6":
+#  county_party = 'R'
+#else:
+#    county_party = 'D'
+def get_past_ten_elections_by_county_all_state():
+    states = get_state_list()
+#county_name = county.text.strip("\n")
+#county_party, county_name
+    results = []
+    for state in states:
+        results += get_past_ten_elections_by_county(state)
+
+    with open('by_county.csv', 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=['State', 'Year', 'County', 'Party'])
+        writer.writeheader()
+        writer.writerows(results)
     return results
 
 
