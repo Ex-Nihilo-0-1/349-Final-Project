@@ -37,11 +37,12 @@ def get_county_results(state, year):
     try:
         counties = table.find_all("tr")[2:-1]
     except Exception as e:
-        print(e, "at line 40")
+        pass
     results = []
   
     for _ in counties:
         try:
+            result = {}
             county = _.find("td")
             county_color = county.attrs["style"].split("background-color:")[1].split(";")[0]
             if county_color == "#FFB6B6":
@@ -49,9 +50,13 @@ def get_county_results(state, year):
             else:
                 county_party = 'D'
             county_name = county.text.strip("\n")
-            results += [(county_party, county_name)]
+            result["State"] = state
+            result["Year"] = year
+            result["Party"] = county_party
+            result["County"] = county_name
+            results += [result]
         except Exception as e:
-            print(e, "at line 54")
+            pass
     return results
 
 
