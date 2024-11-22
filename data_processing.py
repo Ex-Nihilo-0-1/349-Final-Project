@@ -112,7 +112,7 @@ def get_training_data_cainc30():
             print(e)
             pass
 
-with open('training_data.csv', 'r') as file:
+with open('raw_data.csv', 'r') as file:
     csv_reader = csv.DictReader(file)
     data = list(csv_reader)
 
