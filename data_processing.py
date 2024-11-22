@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import csv
 import copy
 import misc
+import numpy as np
 
 
 def get_state_list():
@@ -112,13 +113,18 @@ def get_training_data_cainc30():
             print(e)
             pass
 
-with open('raw_data.csv', 'r') as file:
-    csv_reader = csv.DictReader(file)
-    data = list(csv_reader)
+def read_data(name, mode = "Dict"):
+    
+    with open(name, 'r') as file:
+        csv_reader = csv.DictReader(file)
+        data = list(csv_reader)
+    
+    if mode == "List":
+        l= []
+        target = []
+        for d in data:
+            l += [list(d.values())[5:]]
+            target += [list(d.values())[3]]
+        return target, np.array(l, dtype= np.float32)
+    return data
 
-data = list(filter(lambda d: len(d.keys()) - len(list(filter(None, list(d.values())))) <=5 , data))
-with open('training_data_clean.csv', 'w') as csvfile:
-    writer = csv.DictWriter(csvfile, fieldnames=list(data[0].keys()))
-    writer.writeheader()
-    writer.writerows(data)
-  
