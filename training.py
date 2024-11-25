@@ -6,6 +6,11 @@ import torchmetrics
 import random
 import data_processing
 import numpy as np
+from livelossplot import PlotLosses
+import torch
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+
 
 class data_set(torch.utils.data.Dataset):
     def __init__(self, data, labels):
@@ -59,9 +64,10 @@ def train(nn, input_training_set, input_valid_set, loss_fn = torch.nn.BCELoss(),
     training_set =  data_to_tensor(input_training_set)
     valid_set = data_to_tensor(input_valid_set)
     # Define the optimizer
-    optimizer = torch.optim.Adam(list(nn.parameters()), lr=lr)
+    optimizer = torch.optim.Adam(list(nn.parameters()), lr=lr, weight_decay=0.005)
     dataLoader = torch.utils.data.DataLoader(training_set, batch_size=batch_size, shuffle=True)
-   
+
+    liveloss = PlotLosses()
     # Train the autoencoder
     for epoch in range(epochs):
         for d, l in dataLoader:
@@ -77,11 +83,15 @@ def train(nn, input_training_set, input_valid_set, loss_fn = torch.nn.BCELoss(),
             test_accuracy = training_accuracy(input_training_set, nn)
             test_accuracy = np.round(test_accuracy,2)
             valid_accuracy = training_accuracy(input_valid_set, nn)
-            valid_accuracy = np.round(valid_accuracy, 2)
+      
+            writer.add_scalar("Valid Accuracy", valid_accuracy, epoch)
+            writer.add_scalar("Training Accuracy", test_accuracy, epoch)
+            writer.add_scalar("Loss", loss, epoch)
+          
             print('Epoch:', epoch, 'Loss:', np.round(loss.item(), 2), 'Training Set Accuracy:', test_accuracy, 'Validation Accuracy', valid_accuracy)
-            if valid_accuracy > threshold:
+            if test_accuracy > threshold:
                 break
-        if valid_accuracy> threshold:
+        if test_accuracy> threshold:
             break
         torch.save(nn, 'model.pth')
 
@@ -89,6 +99,7 @@ def train(nn, input_training_set, input_valid_set, loss_fn = torch.nn.BCELoss(),
 
 
 def main():
+
     dict_list = data_processing.read_data("training_data_long.csv")
     data = []
     for _ in dict_list:
@@ -102,20 +113,21 @@ def main():
     model = torch.nn.Sequential(
         torch.nn.Linear(72, 256, bias = True),
         torch.nn.LeakyReLU(),
-        torch.nn.Linear(256, 256),
+        torch.nn.Linear(256, 512),
         torch.nn.LeakyReLU(),
-        torch.nn.Linear(256, 256),
+        torch.nn.Linear(512, 256),
         torch.nn.LeakyReLU(),
         torch.nn.Linear(256, 256),
         torch.nn.LeakyReLU(),
         torch.nn.Linear(256, 1),
         torch.nn.Sigmoid(),
+        
     )
 
-    nn = train(model, training_set, valid_set, batch_size= int(len(training_set)/1), epochs=3000, lr = 0.005, threshold=0.93)
-    #model(data_to_tensor(training_set).data), data_to_tensor(training_set).labels, data_to_tensor(training_set).data
+    nn = train(model, training_set, valid_set, batch_size= int(len(training_set)/1), epochs=3000, lr = 0.0025, threshold=0.95)
 
-
+#model(data_to_tensor(training_set).data), data_to_tensor(training_set).labels, data_to_tensor(training_set).data
+    writer.flush()
 if __name__ == "__main__":
     main()
     
