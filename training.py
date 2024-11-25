@@ -39,7 +39,7 @@ def data_to_tensor(training_set):
     dataset = []
     for d in training_set:
         dataset += [list(map(float, d[4:]))]
-        target += [[0, 1] if d[3] == "D" else [1,0]]
+        target += [[0.] if d[3] == "D" else [1.]]
     data = data_set(dataset, target)
     return data
 
@@ -48,17 +48,18 @@ def training_accuracy(training_set, model):
     data = tensors.data
     labels = np.array(tensors.labels.tolist())
     results = model(data).tolist()
-    results = np.array([[1, 0] if x[0] > x[1] else [0, 1] for x in results])
-    return np.sum((labels == results).all(axis = 1))/len(labels)
+    results = np.array([[1] if x[0] > 0.5 else [0] for x in results])
+    return np.sum(labels == results)/len(labels)
+  
 
 
 
 
-def train(nn, training_set, valid_set, loss_fn = torch.nn.MSELoss(), lr = 0.0002, batch_size = 10, epochs = 5):
-    training_set =  data_to_tensor(training_set)
-    valid_set = data_to_tensor(valid_set)
+def train(nn, input_training_set, input_valid_set, loss_fn = torch.nn.BCELoss(), lr = 0.0002, batch_size = 10, epochs = 5, threshold = 0.9):
+    training_set =  data_to_tensor(input_training_set)
+    valid_set = data_to_tensor(input_valid_set)
     # Define the optimizer
-    optimizer = torch.optim.Adagrad(list(nn.parameters()), lr=lr)
+    optimizer = torch.optim.Adam(list(nn.parameters()), lr=lr)
     dataLoader = torch.utils.data.DataLoader(training_set, batch_size=batch_size, shuffle=True)
    
     # Train the autoencoder
@@ -68,16 +69,20 @@ def train(nn, training_set, valid_set, loss_fn = torch.nn.MSELoss(), lr = 0.0002
             y_pred = nn(d)
 
             # Compute the loss
-            loss = loss_fn(y_pred.float(), l.float())
+            loss = loss_fn(y_pred, l)
             # Backward pass
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            test_accuracy = (torch.sum(torch.vmap(torch.argmax)(training_set.labels) == torch.vmap(torch.argmax)(nn(training_set.data)))/len(training_set.labels)).tolist()
+            test_accuracy = training_accuracy(input_training_set, nn)
             test_accuracy = np.round(test_accuracy,2)
-            valid_accuracy = (torch.sum(torch.vmap(torch.argmax)(valid_set.labels) == torch.vmap(torch.argmax)(nn(valid_set.data)))/len(valid_set.labels)).tolist()
-            valid_accuracy = np.round(valid_accuracy,2)
-            print('Epoch:', epoch, 'Loss:', np.round(loss.item(), 2), 'Training Set Accuracy:', test_accuracy, 'Validation Accuracy:', valid_accuracy)
+            valid_accuracy = training_accuracy(input_valid_set, nn)
+            valid_accuracy = np.round(valid_accuracy, 2)
+            print('Epoch:', epoch, 'Loss:', np.round(loss.item(), 2), 'Training Set Accuracy:', test_accuracy, 'Validation Accuracy', valid_accuracy)
+            if valid_accuracy > threshold:
+                break
+        if valid_accuracy> threshold:
+            break
         torch.save(nn, 'model.pth')
 
     return nn
@@ -95,33 +100,22 @@ def main():
 
 
     model = torch.nn.Sequential(
-        torch.nn.Linear(72, 72),
-        torch.nn.ReLU(),
-        torch.nn.Linear(72, 72),
-        torch.nn.ReLU(),
-        torch.nn.Linear(72, 72),
-        torch.nn.ReLU(),
-        torch.nn.Linear(72, 72),
-        torch.nn.ReLU(),
-        torch.nn.Linear(72, 24),
-        torch.nn.ReLU(),
-        torch.nn.Linear(24, 24),
-        torch.nn.ReLU(),
-        torch.nn.Linear(24, 24),
-        torch.nn.ReLU(),
-        torch.nn.Linear(24, 24),
-        torch.nn.ReLU(),
-        torch.nn.Linear(24, 24),
-        torch.nn.ReLU(),
-        torch.nn.Linear(24, 24),
-        torch.nn.ReLU(),
-        torch.nn.Linear(24, 2),
-        torch.nn.Softmax()
+        torch.nn.Linear(72, 256, bias = True),
+        torch.nn.LeakyReLU(),
+        torch.nn.Linear(256, 256),
+        torch.nn.LeakyReLU(),
+        torch.nn.Linear(256, 256),
+        torch.nn.LeakyReLU(),
+        torch.nn.Linear(256, 256),
+        torch.nn.LeakyReLU(),
+        torch.nn.Linear(256, 1),
+        torch.nn.Sigmoid(),
     )
 
+    nn = train(model, training_set, valid_set, batch_size= int(len(training_set)/1), epochs=3000, lr = 0.005, threshold=0.93)
+    #model(data_to_tensor(training_set).data), data_to_tensor(training_set).labels, data_to_tensor(training_set).data
 
-    nn_trained = train(model, training_set, valid_set, batch_size=10, epochs=100, lr = 0.025)
 
 if __name__ == "__main__":
     main()
-
+    
