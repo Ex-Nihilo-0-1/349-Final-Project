@@ -3,7 +3,9 @@ from bs4 import BeautifulSoup
 import csv
 import copy
 import misc
-
+import numpy as np
+import pandas as pd
+import re
 
 def get_state_list():
     f = r.get("https://www.archives.gov/electoral-college/2024")
@@ -86,8 +88,10 @@ def get_past_ten_elections_by_county_all_states():
         writer.writerows(results)
     return results
 
-def get_training_data_cainc30():
-    results = get_past_ten_elections_by_county_all_states()
+def get_training_data():
+    results = read_data('by_county.csv')
+
+    # MERGING CAINC DARTA WITH BY COUNTY ELECTION RESULTS.
     for result in results:
         state_abbrev = misc.us_state_to_abbrev[result["State"]]
         try:
@@ -105,20 +109,113 @@ def get_training_data_cainc30():
             econ_data = list(filter(lambda d: result["County"] in d["GeoName"], data[:-5]))
             
             for ed in econ_data:
-                year = result["Year"]
+                year = int(result["Year"])
                 label = ed["Description"]
-                result[label] = int(ed[str(year)])
+                result[label + "YR-1"] = int(ed[str(year - 1)]) 
+                result[label + "YR-2"] = int(ed[str(year - 2)])
+                result[label + "YR-3"] = int(ed[str(year - 3)])
         except Exception as e:
             print(e)
             pass
 
-with open('raw_data.csv', 'r') as file:
-    csv_reader = csv.DictReader(file)
-    data = list(csv_reader)
+    for result in results:
+        state_abbrev = misc.us_state_to_abbrev[result["State"]]
+        try:
+            with open('CAINC1_Annual Personal Income by County/CAINC1_'+ state_abbrev + '_1969_2023.csv', 'r') as file:
+                csv_reader = csv.DictReader(file)
+                data = list(csv_reader)[:-5]
+            for _ in data:
+                del _["GeoFIPS"]
+                del _["Region"]
+                del _["TableName"]
+                del _["Unit"]
+                del _["LineCode"]
+            
+            
+            econ_data = list(filter(lambda d: result["County"] in d["GeoName"], data[:-5]))
+            
+            for ed in econ_data:
+                year = int(result["Year"])
+                label = ed["Description"]
+                result[label + "YR-1"] = int(ed[str(year - 1)]) 
+                result[label + "YR-2"] = int(ed[str(year - 2)])
+                result[label + "YR-3"] = int(ed[str(year - 3)])
+        except Exception as e:
+            print(e)
+            pass
+    
+        # REMOVE ROWS WITH TOO MANY MISSING DATA
+        data = list(filter(lambda d: len(d.keys()) == len(list(filter(None, list(d.values())))) , results))
 
-data = list(filter(lambda d: len(d.keys()) - len(list(filter(None, list(d.values())))) <=5 , data))
-with open('training_data_clean.csv', 'w') as csvfile:
-    writer = csv.DictWriter(csvfile, fieldnames=list(data[0].keys()))
-    writer.writeheader()
-    writer.writerows(data)
-  
+        # ADJUST FOR INFLATION USING PANDAS
+        df = pd.DataFrame(data)
+        # remove population columns
+        columns = df.columns
+        populations = [df['Population (persons) 1/YR-1'],
+                    df['Population (persons) 1/YR-2'],
+                    df['Population (persons) 1/YR-3']]
+        df.drop(columns = "Population (persons) 1/YR-1", inplace=True)
+        df.drop(columns = "Population (persons) 1/YR-2", inplace=True)
+        df.drop(columns = "Population (persons) 1/YR-3", inplace=True)
+        df.drop(columns = " Population (persons) 3/YR-1", inplace=True)
+        df.drop(columns = " Population (persons) 3/YR-2", inplace=True)
+        df.drop(columns = " Population (persons) 3/YR-3", inplace=True)
+        #adjust for inflation
+        for i in df.index:
+            try:
+                year = int(df.iloc[i,1])
+                df.iloc[i, 4:] = df.iloc[i, 4:].map(lambda x: int(x) * misc.cpi_dict[year])
+            except Exception as e:
+                print(e)
+                pass
+
+        #add population columns back
+        df["Population YR-1"] = populations[0]
+        df["Population YR-2"] = populations[1]
+        df["Population YR-3"] = populations[2]
+
+        # NORMALIZE DATA
+        for column in df.columns:
+            try:
+                if column != "Year":
+                    df[column] = df[column].map(lambda x: int(x))
+                    x_max = max(list(df[column]))
+                    x_min = min(list(df[column]))
+                    df[column] = df[column].map(lambda x: (x - x_min)/(x_max - x_min))
+            except Exception as e:
+                print(e)
+        df.to_csv("get_training_data()_output.csv")
+        return data
+    
+    
+    
+
+
+def read_data(name, mode = "Dict"):
+    
+    with open(name, 'r') as file:
+        csv_reader = csv.DictReader(file)
+        data = list(csv_reader)
+    
+    if mode == "List":
+        l= []
+        target = []
+        for d in data:
+            l += [list(d.values())[5:]]
+            target += [list(d.values())[4]]
+        return target, np.array(l, dtype= np.float32)
+    return data
+
+def county_vote_csv_to_df(filename):
+    """
+    change the format  of countypres_2020-2020.csv to pandas dataframe format,
+    the title is: year, state, county_name, candidate, candidatevotes
+
+    returns: a pandas dataframe of the csv file.
+    """
+    data = pd.read_csv(filename)
+    result_df = data[['year', 'state', 'county_name',"party", 'candidate', 'candidatevotes']]
+
+    # Sort by year, state, and county
+    result_df = result_df.sort_values(['year', 'state', 'county_name', 'candidate'])
+    return result_df
