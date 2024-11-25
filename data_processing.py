@@ -206,3 +206,16 @@ def read_data(name, mode = "Dict"):
         return target, np.array(l, dtype= np.float32)
     return data
 
+def county_vote_csv_to_df(filename):
+    """
+    change the format  of countypres_2020-2020.csv to pandas dataframe format,
+    the title is: year, state, county_name, candidate, candidatevotes
+
+    returns: a pandas dataframe of the csv file.
+    """
+    data = pd.read_csv(filename)
+    result_df = data[['year', 'state', 'county_name',"party", 'candidate', 'candidatevotes']]
+
+    # Sort by year, state, and county
+    result_df = result_df.sort_values(['year', 'state', 'county_name', 'candidate'])
+    return result_df
