@@ -10,6 +10,7 @@ from livelossplot import PlotLosses
 import torch
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
+import datetime
 
 
 class data_set(torch.utils.data.Dataset):
@@ -60,41 +61,45 @@ def training_accuracy(training_set, model):
 
 
 
-def train(nn, input_training_set, input_valid_set, loss_fn = torch.nn.BCELoss(), lr = 0.0002, batch_size = 10, epochs = 5, threshold = 0.9):
+def train(nn, input_training_set, input_valid_set, h_params = {}, loss_fn = torch.nn.BCELoss()):
     training_set =  data_to_tensor(input_training_set)
     valid_set = data_to_tensor(input_valid_set)
+    batch_size = h_params['Batch Size']
+    epochs = h_params['Epochs']
+    lr = h_params['LR']
+    threshold = h_params['Threshold']
     # Define the optimizer
-    optimizer = torch.optim.Adam(list(nn.parameters()), lr=lr, weight_decay=0.005)
+    optimizer = torch.optim.Adam(list(nn.parameters()), lr=lr)
     dataLoader = torch.utils.data.DataLoader(training_set, batch_size=batch_size, shuffle=True)
 
-    liveloss = PlotLosses()
-    # Train the autoencoder
+    writer.add_text("hparams", str(h_params))
     for epoch in range(epochs):
         for d, l in dataLoader:
-            # Forward pass
+  
             y_pred = nn(d)
-
-            # Compute the loss
             loss = loss_fn(y_pred, l)
-            # Backward pass
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
             test_accuracy = training_accuracy(input_training_set, nn)
             test_accuracy = np.round(test_accuracy,2)
             valid_accuracy = training_accuracy(input_valid_set, nn)
-      
+            
+            
             writer.add_scalar("Valid Accuracy", valid_accuracy, epoch)
             writer.add_scalar("Training Accuracy", test_accuracy, epoch)
             writer.add_scalar("Loss", loss, epoch)
+            
           
             print('Epoch:', epoch, 'Loss:', np.round(loss.item(), 2), 'Training Set Accuracy:', test_accuracy, 'Validation Accuracy', valid_accuracy)
+
             if test_accuracy > threshold:
                 break
         if test_accuracy> threshold:
             break
-        torch.save(nn, 'model.pth')
-
+    
+    torch.save(nn, str(h_params) + str(datetime.datetime.now()) + '.pth')
     return nn
 
 
@@ -124,10 +129,12 @@ def main():
         
     )
 
-    nn = train(model, training_set, valid_set, batch_size= int(len(training_set)/1), epochs=3000, lr = 0.0025, threshold=0.95)
-
+    
+    hparams = {"Epochs": 3000, "LR": 0.0025, "Threshold": 0.95, "Batch Size": int(len(training_set)/1)}
+    nn = train(model, training_set, valid_set, hparams)
 #model(data_to_tensor(training_set).data), data_to_tensor(training_set).labels, data_to_tensor(training_set).data
     writer.flush()
+    writer.close()
 if __name__ == "__main__":
     main()
     
