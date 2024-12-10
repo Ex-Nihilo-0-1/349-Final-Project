@@ -74,7 +74,7 @@ def train(nn, input_training_set, input_valid_set, h_params = {}, loss_fn = torc
     print(type(nn.state_dict()))
     writer.add_text("Hyperparameters", str(h_params))
     beginning_time = str(datetime.datetime.now())[:-7]
-    torch.save(nn.state_dict(), "./models/SD_" + beginning_time + ".pth")
+    # threshold = h_params['Threshold']
     for epoch in range(epochs):
         for d, l in dataLoader:
   
@@ -93,10 +93,10 @@ def train(nn, input_training_set, input_valid_set, h_params = {}, loss_fn = torc
             writer.add_scalar("Loss", loss, epoch)
             
             print('Epoch:', epoch, 'Loss:', np.round(loss.item(), 2), 'Training Set Accuracy:', np.round(training_accuracy, 3), 'Validation Accuracy', np.round(valid_accuracy, 3))
-            torch.save(nn, "./models/PR_" + beginning_time + '.pth')
-            # if test_accuracy > threshold:
-            #     break
-        # if test_accuracy> threshold:
+            torch.save(nn, "./models/PR_" + str(list(h_params.values())) + " " + beginning_time + '.pth')
+        #     if training_accuracy > threshold:
+        #         break
+        # if training_accuracy> threshold:
         #     break
     return nn
 

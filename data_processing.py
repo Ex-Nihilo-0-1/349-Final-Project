@@ -199,7 +199,7 @@ def get_training_data(raw_data):
 
 def read_data(name, mode = "Dict"):
     
-    with open(name, 'r') as file:
+    with open(name, 'r', encoding='latin-1') as file:
         csv_reader = csv.DictReader(file)
         data = list(csv_reader)
     
