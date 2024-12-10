@@ -44,8 +44,8 @@ def data_to_tensor(training_set):
     target = []
     dataset = []
     for d in training_set:
-        dataset += [list(map(float, d[4:]))]
-        target += [[0.] if d[3] == "D" else [1.]]
+        dataset += [list(map(float, d[5:-1]))]
+        target += [[0.] if d[4] == "D" else [1.]]
     data = data_set(dataset, target)
     return data
 
@@ -105,18 +105,18 @@ def train(nn, input_training_set, input_valid_set, h_params = {}, loss_fn = torc
 
 def main():
 
-    dict_list = data_processing.read_data("training_data_long.csv")
+    dict_list = data_processing.read_data("training_data_extended.csv")
     data = []
     for _ in dict_list:
-        data += [list(_.values())[1:]]
+        data += [list(_.values())]
     random.shuffle(data)
-    valid_set = data[-1000:]
-    test_set = data[:1000]
-    training_set = data[1000:-1000]
+    valid_set = data[-2000:]
+    test_set = data[:2000]
+    training_set = data[2000:-2000]
 
 
     model = torch.nn.Sequential(
-        torch.nn.Linear(72, 256, bias = True),
+        torch.nn.Linear(96, 256, bias = True),
         torch.nn.LeakyReLU(),
         torch.nn.Linear(256, 512),
         torch.nn.LeakyReLU(),
