@@ -49,7 +49,7 @@ def data_to_tensor(training_set):
     data = data_set(dataset, target)
     return data
 
-def training_accuracy(training_set, model):
+def accuracy(training_set, model):
     tensors = data_to_tensor(training_set)
     data = tensors.data
     labels = np.array(tensors.labels.tolist())
@@ -62,17 +62,19 @@ def training_accuracy(training_set, model):
 
 
 def train(nn, input_training_set, input_valid_set, h_params = {}, loss_fn = torch.nn.BCELoss()):
+    
     training_set =  data_to_tensor(input_training_set)
     valid_set = data_to_tensor(input_valid_set)
     batch_size = h_params['Batch Size']
     epochs = h_params['Epochs']
     lr = h_params['LR']
-    threshold = h_params['Threshold']
     # Define the optimizer
     optimizer = torch.optim.Adam(list(nn.parameters()), lr=lr)
     dataLoader = torch.utils.data.DataLoader(training_set, batch_size=batch_size, shuffle=True)
-
-    writer.add_text("hparams", str(h_params))
+    print(type(nn.state_dict()))
+    writer.add_text("Hyperparameters", str(h_params))
+    beginning_time = str(datetime.datetime.now())[:-7]
+    torch.save(nn.state_dict(), "./models/SD_" + beginning_time + ".pth")
     for epoch in range(epochs):
         for d, l in dataLoader:
   
@@ -82,24 +84,20 @@ def train(nn, input_training_set, input_valid_set, h_params = {}, loss_fn = torc
             loss.backward()
             optimizer.step()
 
-            test_accuracy = training_accuracy(input_training_set, nn)
-            test_accuracy = np.round(test_accuracy,2)
-            valid_accuracy = training_accuracy(input_valid_set, nn)
+            training_accuracy = accuracy(input_training_set, nn)
+            valid_accuracy = accuracy(input_valid_set, nn)
             
             
             writer.add_scalar("Valid Accuracy", valid_accuracy, epoch)
-            writer.add_scalar("Training Accuracy", test_accuracy, epoch)
+            writer.add_scalar("Training Accuracy", training_accuracy, epoch)
             writer.add_scalar("Loss", loss, epoch)
             
-          
-            print('Epoch:', epoch, 'Loss:', np.round(loss.item(), 2), 'Training Set Accuracy:', test_accuracy, 'Validation Accuracy', valid_accuracy)
-
-            if test_accuracy > threshold:
-                break
-        if test_accuracy> threshold:
-            break
-    
-    torch.save(nn, str(h_params) + str(datetime.datetime.now()) + '.pth')
+            print('Epoch:', epoch, 'Loss:', np.round(loss.item(), 2), 'Training Set Accuracy:', np.round(training_accuracy, 3), 'Validation Accuracy', np.round(valid_accuracy, 3))
+            torch.save(nn, "./models/PR_" + beginning_time + '.pth')
+            # if test_accuracy > threshold:
+            #     break
+        # if test_accuracy> threshold:
+        #     break
     return nn
 
 
@@ -110,10 +108,9 @@ def main():
     for _ in dict_list:
         data += [list(_.values())]
     random.shuffle(data)
-    valid_set = data[-2000:]
-    test_set = data[:2000]
-    training_set = data[2000:-2000]
-
+    valid_set = data[-4000:]
+    test_set = data[:4000]
+    training_set = data[4000:-4000]
 
     model = torch.nn.Sequential(
         torch.nn.Linear(96, 256, bias = True),
@@ -128,11 +125,9 @@ def main():
         torch.nn.Sigmoid(),
         
     )
-
     
-    hparams = {"Epochs": 3000, "LR": 0.0025, "Threshold": 0.95, "Batch Size": int(len(training_set)/1)}
-    nn = train(model, training_set, valid_set, hparams)
-#model(data_to_tensor(training_set).data), data_to_tensor(training_set).labels, data_to_tensor(training_set).data
+    h_params = {"Epochs": 10000, "LR": 0.0025, "Batch Size": 4000}
+    train(model, training_set, valid_set, h_params)
     writer.flush()
     writer.close()
 if __name__ == "__main__":
