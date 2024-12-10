@@ -215,7 +215,7 @@ def read_data(name, mode = "Dict"):
 def write_data(filename, data: list[dict]):
 
     with open(filename, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=['State', 'Year', 'County', 'Party'])
+        writer = csv.DictWriter(csvfile, list(data[0].keys()))
         writer.writeheader()
         writer.writerows(data)
 
